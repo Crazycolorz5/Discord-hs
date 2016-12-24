@@ -6,9 +6,11 @@ import Control.Arrow
 import Parser --TODO -- make a copy of my parser in here
 import Control.Monad.Fail
 import Prelude hiding (fail)
-import Data.Char (isHexDigit, digitToInt, chr, ord)
+import Data.Char (isHexDigit, isDigit, digitToInt, chr, ord)
 
 data JSONVal = JSONNull | JSONBool Bool | JSONString String | JSONNum Double | JSONArray [JSONVal] | JSONObj (Map String JSONVal) deriving Show
+
+--Implemented based on the specs found at: http://rfc7159.net/rfc7159
 
 readJSON :: String -> JSONVal
 readJSON json = case tryParse parseJSON json of
@@ -28,12 +30,7 @@ parseJSON = do
         singlewsParse = do 
             a <- parseAnyChar
             if isWhiteSpace a then return a else fail [a]
-        isWhiteSpace c = case c of
-                            ' ' -> True
-                            '\t' -> True
-                            '\n' -> True
-                            '\r' -> True
-                            otherwise -> False
+        isWhiteSpace = flip elem [' ', '\t', '\n', '\r']
         
     wsParseChar :: Char -> Parser String Char
     wsParseChar char = do
@@ -49,23 +46,15 @@ parseJSON = do
     name_separator = wsParseChar ':'
     value_separator = wsParseChar ','
     
+    unify = either id id
+    
     parseValue :: Parser String JSONVal
-    parseValue = flip fmap (parseNull <|> parseBool <|> parseString <|> parseNum <|> parseArray <|> parseObject) (\res -> case res of
-        Left x -> case x of
-                       Left y -> case y of
-                                      Left z -> case z of
-                                                     Left a -> case a of
-                                                                    Left b -> b
-                                                                    Right b -> case b of
-                                                                                    Left c -> c
-                                                                                    Right c -> c
-                                                     Right a -> a
-                                      Right z -> z
-                       Right y -> y
-        Right x -> x)    
+    parseValue = fmap ((unify `either` unify) `either` unify) $ ((parseNull <|> parseBool) <|> (parseString <|> parseNum)) <|> (parseArray <|> parseObject) 
+    --Kind of ugly to get the type to line up, but basically since it's Eithers of JSONVal or more nested Eithers,
+    --I can just unify (id to the correct side of the either) to float it all the way down.
     
     parseNull = parseWord "null" >> return JSONNull
-    parseBool = fmap (id +++ id) (parseTrue <|> parseFalse) where
+    parseBool = fmap (either id id) (parseTrue <|> parseFalse) where
         
           parseTrue = parseWord "true" >> return (JSONBool True)
           parseFalse = parseWord "false" >> return (JSONBool False)
@@ -100,14 +89,8 @@ parseJSON = do
                 then do
                     b <- parseAnyChar
                     case b of
-                        '\"' -> return '\"'
-                        '\\' -> return '\\'
-                        '/' -> return '/'
-                        'r' -> return '\r'
-                        'f' -> return '\f'
-                        'n' -> return '\n'
-                        'b' -> return '\b'
-                        't' -> return '\t'
+                        '\"' -> return '\"'; '\\' -> return '\\'; '/' -> return '/'
+                        'r' -> return '\r'; 'f' -> return '\f'; 'n' -> return '\n'; 'b' -> return '\b'; 't' -> return '\t'
                         'u' -> fmap chr fourHexDig >>= return
                         otherwise -> fail [b]
                 else if val == 0x20 || val == 0x21 || val >= 0x23 && val <= 0x5B || val >= 0x5D 
@@ -118,7 +101,7 @@ parseJSON = do
             b <- parseHexDigit
             c <- parseHexDigit
             d <- parseHexDigit
-            return (16*16*16*a + 16*16*b + 16*c + d)
+            return (0x1000*a + 0x100*b + 0x10*c + d)
           parseHexDigit = do
             a <- parseAnyChar
             if isHexDigit a then return (digitToInt a) else fail [a]
@@ -133,7 +116,7 @@ parseJSON = do
             digit <- parseDigit 
             digits <- kleeneStar parseDigit
             return $ dot:digit:digits
-          parseDigit = parseAnyChar >>= \c -> if c `elem` ['0','1','2','3','4','5','6','7','8','9'] then return c else fail [c]
+          parseDigit = parseAnyChar >>= \c -> if isDigit c then return c else fail [c]
           parseNonzeroDigit = parseDigit >>= \c -> if c == '0' then fail [c] else return c
           parseExp = do
             e <- fmap unify $ parseChar 'e' <|> parseChar 'E'
@@ -142,8 +125,7 @@ parseJSON = do
             return $ case mbSign of
                         Nothing -> e : dig : digs
                         Just s -> e : s : dig : digs
-            where unify = either id id
-          process (((mbMinus, int), mbFrac), mbExp) = JSONNum $ read (showMb mbMinus ++ int ++ showMb mbFrac ++ showMb mbExp) where showMb Nothing = ""; showMb (Just x) = show x
+          process (((mbMinus, int), mbFrac), mbExp) = JSONNum $ read (showMb mbMinus ++ int ++ showMb mbFrac ++ showMb mbExp) where showMb Nothing = ""; showMb (Just x) = show x --Use the built-in read function to parse it as a Double.
               
     parseArray = do
         begin_array
