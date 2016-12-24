@@ -12,10 +12,8 @@ data JSONVal = JSONNull | JSONBool Bool | JSONString String | JSONNum Double | J
 
 --Implemented based on the specs found at: http://rfc7159.net/rfc7159
 
-readJSON :: String -> JSONVal
-readJSON json = case tryParse parseJSON json of
-                  Just ([], x) -> x
-                  otherwise -> error "Invalid JSON text."
+readJSON :: String -> Maybe JSONVal
+readJSON = getResult . tryParse parseJSON
 
 parseJSON :: Parser String JSONVal
 parseJSON = do
