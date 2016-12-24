@@ -1,4 +1,4 @@
-module JSON (JSONVal (..), readJSON, test) where
+module JSON (JSONVal (..), readJSON) where
 
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
