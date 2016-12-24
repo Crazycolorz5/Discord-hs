@@ -8,23 +8,6 @@ import Control.Monad.Fail
 import Prelude hiding (fail)
 import Data.Char (isHexDigit, digitToInt, chr, ord)
 
-
-test = "{\
-\    \"id\": \"162701077035089920\",\
-\    \"channel_id\": \"131391742183342080\",\
-\    \"author\": {},\
-\    \"content\": \"Hey guys!\",\
-\    \"timestamp\": \"2016-03-24T23:15:59.605000+00:00\",\
-\    \"edited_timestamp\": null,\
-\    \"tts\": false,\
-\    \"mention_everyone\": false,\
-\    \"mentions\": [],\
-\    \"mention_roles\": [],\
-\    \"attachments\": [],\
-\    \"embeds\": [],\
-\    \"reactions\": []\
-\}"
-
 data JSONVal = JSONNull | JSONBool Bool | JSONString String | JSONNum Double | JSONArray [JSONVal] | JSONObj (Map String JSONVal) deriving Show
 
 readJSON :: String -> JSONVal
