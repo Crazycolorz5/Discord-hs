@@ -1,4 +1,4 @@
-# Discord-hs
-Attempting to make a Discord API library in Haskell, so I can finally make lambdabot for Discord.
+# JSONParser-hs
+Parses JSON texts and stores it in a data type. Also outputs the same data type. 
 
 Dependent on my Combinator Parsing Haskell code.
