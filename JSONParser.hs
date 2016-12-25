@@ -8,9 +8,18 @@ import Control.Monad.Fail
 import Prelude hiding (fail)
 import Data.Char (isHexDigit, isDigit, digitToInt, chr, ord)
 
-data JSONVal = JSONNull | JSONBool Bool | JSONString String | JSONNum Double | JSONArray [JSONVal] | JSONObj (Map String JSONVal) deriving Show
+data JSONVal = JSONNull | JSONBool Bool | JSONString String | JSONNum Double | JSONArray [JSONVal] | JSONObj (Map String JSONVal)
 
 --Implemented based on the specs found at: http://rfc7159.net/rfc7159
+
+instance Show JSONVal where
+    show (JSONNull) = "null"
+    show (JSONBool True) = "true"
+    show (JSONBool False) = "false"
+    show (JSONNum x) = show x
+    show (JSONString str) = show str
+    show (JSONArray l) = show l --Haskell gives us the [] for free.
+    show (JSONObj o) = if Map.null o then "{}" else '{': (foldl1 (\acc e -> acc ++ ',':e) . map (\e -> (show . fst) e ++ ':':(show . snd) e)) (Map.toList o) ++ "}"
 
 readJSON :: String -> Maybe JSONVal
 readJSON = getResult . tryParse parseJSON
@@ -44,15 +53,11 @@ parseJSON = do
     name_separator = wsParseChar ':'
     value_separator = wsParseChar ','
     
-    unify = either id id
-    
     parseValue :: Parser String JSONVal
-    parseValue = fmap ((unify `either` unify) `either` unify) $ ((parseNull <|> parseBool) <|> (parseString <|> parseNum)) <|> (parseArray <|> parseObject) 
-    --Kind of ugly to get the type to line up, but basically since it's Eithers of JSONVal or more nested Eithers,
-    --I can just unify (id to the correct side of the either) to float it all the way down.
+    parseValue = parseNull <||> parseBool <||> parseString <||> parseNum <||> parseArray <||> parseObject
     
     parseNull = parseWord "null" >> return JSONNull
-    parseBool = fmap (either id id) (parseTrue <|> parseFalse) where
+    parseBool = parseTrue <||> parseFalse where
         
           parseTrue = parseWord "true" >> return (JSONBool True)
           parseFalse = parseWord "false" >> return (JSONBool False)
@@ -106,9 +111,7 @@ parseJSON = do
         
     parseNum = fmap process $ optional (parseChar '-') <&> parseInt <&> optional parseFrac <&> optional parseExp where
         
-          parseInt = flip fmap (parseChar '0' <|> parseNonzeroDigit <&> kleeneStar parseDigit) (\res -> case res of
-            Left _ -> ['0']
-            Right (x, xs) -> x:xs)
+          parseInt = fmap (either (const "0") (uncurry (:))) (parseChar '0' <|> parseNonzeroDigit <&> kleeneStar parseDigit)
           parseFrac = do 
             dot <- parseChar '.'
             digit <- parseDigit 
@@ -117,8 +120,8 @@ parseJSON = do
           parseDigit = parseAnyChar >>= \c -> if isDigit c then return c else fail [c]
           parseNonzeroDigit = parseDigit >>= \c -> if c == '0' then fail [c] else return c
           parseExp = do
-            e <- fmap unify $ parseChar 'e' <|> parseChar 'E'
-            mbSign <- optional (fmap unify $ parseChar '-' <|> parseChar '+')
+            e <- parseChar 'e' <||> parseChar 'E'
+            mbSign <- optional (parseChar '-' <||> parseChar '+')
             (dig, digs) <- parseDigit <&> kleeneStar parseDigit
             return $ case mbSign of
                         Nothing -> e : dig : digs
