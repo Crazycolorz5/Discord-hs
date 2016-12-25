@@ -109,6 +109,7 @@ parseJSON = do
             a <- parseAnyChar
             if isHexDigit a then return (digitToInt a) else fail [a]
         
+    parseNum :: Parser String JSONVal
     parseNum = fmap process $ optional (parseChar '-') <&> parseInt <&> optional parseFrac <&> optional parseExp where
         
           parseInt = fmap (either (const "0") (uncurry (:))) (parseChar '0' <|> parseNonzeroDigit <&> kleeneStar parseDigit)
@@ -128,6 +129,7 @@ parseJSON = do
                         Just s -> e : s : dig : digs
           process (((mbMinus, int), mbFrac), mbExp) = JSONNum $ read (showMb mbMinus ++ int ++ showMb mbFrac ++ showMb mbExp) where showMb Nothing = ""; showMb (Just x) = show x --Use the built-in read function to parse it as a Double.
               
+    parseArray :: Parser String JSONVal
     parseArray = do
         begin_array
         l <- optional parseInner 
