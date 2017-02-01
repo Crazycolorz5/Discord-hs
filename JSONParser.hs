@@ -3,7 +3,7 @@ module JSON (JSONVal (..), readJSON) where
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 import Control.Arrow
-import Parser --TODO -- make a copy of my parser in here
+import Parser
 import Control.Monad.Fail
 import Prelude hiding (fail)
 import Data.Char (isHexDigit, isDigit, digitToInt, chr, ord)
@@ -54,10 +54,10 @@ parseJSON = do
     value_separator = wsParseChar ','
     
     parseValue :: Parser String JSONVal
-    parseValue = parseNull <||> parseBool <||> parseString <||> parseNum <||> parseArray <||> parseObject
+    parseValue = parseNull <|> parseBool <|> parseString <|> parseNum <|> parseArray <|> parseObject
     
     parseNull = parseWord "null" >> return JSONNull
-    parseBool = parseTrue <||> parseFalse where
+    parseBool = parseTrue <|> parseFalse where
         
           parseTrue = parseWord "true" >> return (JSONBool True)
           parseFalse = parseWord "false" >> return (JSONBool False)
@@ -112,7 +112,7 @@ parseJSON = do
     parseNum :: Parser String JSONVal
     parseNum = fmap process $ optional (parseChar '-') <&> parseInt <&> optional parseFrac <&> optional parseExp where
         
-          parseInt = fmap (either (const "0") (uncurry (:))) (parseChar '0' <|> parseNonzeroDigit <&> kleeneStar parseDigit)
+          parseInt = fmap (either (const "0") (uncurry (:))) (parseChar '0' `parseEither` parseNonzeroDigit <&> kleeneStar parseDigit)
           parseFrac = do 
             dot <- parseChar '.'
             digit <- parseDigit 
@@ -121,8 +121,8 @@ parseJSON = do
           parseDigit = parseAnyChar >>= \c -> if isDigit c then return c else fail [c]
           parseNonzeroDigit = parseDigit >>= \c -> if c == '0' then fail [c] else return c
           parseExp = do
-            e <- parseChar 'e' <||> parseChar 'E'
-            mbSign <- optional (parseChar '-' <||> parseChar '+')
+            e <- parseChar 'e' <|> parseChar 'E'
+            mbSign <- optional (parseChar '-' <|> parseChar '+')
             (dig, digs) <- parseDigit <&> kleeneStar parseDigit
             return $ case mbSign of
                         Nothing -> e : dig : digs
